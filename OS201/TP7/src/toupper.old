@@ -1,0 +1,25 @@
+#include <stdio.h>
+#include <time.h>
+#include <unistd.h>
+#include <ctype.h>
+
+char buffer[1024];
+char hostname[128];
+
+int main() {
+	int pid = getpid();
+	gethostname(hostname,128);
+	while(1) {
+		if (fgets(buffer,1024,stdin) == NULL) {
+			break;
+		}
+		char* ptr = buffer;
+		while (*ptr) {
+			*ptr = toupper(*ptr);
+			ptr++;
+		}
+		sleep(3);
+		printf("on %s pid %d : %s\n",hostname,pid,buffer);
+		fflush(stdout);
+	}
+}
