@@ -257,6 +257,7 @@ class TinySlam:
     def compute(self):
         """ Useless function, just for the exercise on using the profiler """
         # Remove after TP1
+        return
 
         ranges = np.random.rand(3600)
         ray_angles = np.arange(-np.pi,np.pi,np.pi/1800)
