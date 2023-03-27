@@ -7,7 +7,7 @@
 # Fast installation on Ubuntu
 
 ## The first time : install dev tools
- 
+
 ```bash
 sudo apt update -y
 sudo apt install -y git libjpeg-dev zlib1g-dev python3.8 python3.8-venv python3.8-dev python3-pip virtualenvwrapper
@@ -50,6 +50,7 @@ We need, at least, *Python 3.8*.
 - On *Ubuntu 18.04*, the default version of *Python* is 2.7.17. And the default version of *Python3* is 3.6.9.
 
 But it is easy to install *Python* 3.8:
+
 ```bash
 sudo apt update
 sudo apt install python3.8 python3.8-venv python3.8-dev
@@ -69,7 +70,9 @@ sudo apt install python3-pip
 ```bash
 pip3 --version
 ```
+
 For Ubuntu 20.04, it returns :
+
 ```bash
 pip 20.0.2 from /usr/lib/python3/dist-packages/pip (python 3.8)
 ```
@@ -85,7 +88,9 @@ To use the correct version, you have to use `python3.8 -m pip` instead of `pip`,
 ```bash
 python3.8 -m pip --version
 ```
+
 For Ubuntu 20.04, it returns :
+
 ```bash
 pip 22.3.1 from /home/username/.local/lib/python3.8/site-packages/pip (python 3.8)
 ```
@@ -100,6 +105,7 @@ For that, you should install some tools:
 sudo apt update
 sudo apt install virtualenvwrapper
 ```
+
 ## Install this *tp_rob201* repository
 
 - To install this git repository, go to the directory you want to work in (for example: *~/code/*).
@@ -109,6 +115,7 @@ sudo apt install virtualenvwrapper
 ```bash
 git clone https://github.com/emmanuel-battesti/tp_rob201.git
 ```
+
 This command will create the directory *tp_rob201* with all the code inside it.
 
 - Create your virtual environment. This command will create a directory *env* where all dependencies will be installed:
@@ -161,9 +168,9 @@ This installation procedure has been tested with Windows 10. Installation is als
 
 Git is a tool for source code management. [Git is used](https://www.simplilearn.com/tutorials/git-tutorial/what-is-git "Git is used") to tracking changes in the source code of *place-bot*.
 
- - Download the [latest version of    Git](https://git-scm.com/download/win) and choose the 64/32 bit version.
- - After the file is downloaded, install it in the system.
- - Once installed, select *Launch the Git Bash*, then click on *finish*. The *Git Bash* is now launched.
+- Download the [latest version of    Git](https://git-scm.com/download/win) and choose the 64/32 bit version.
+- After the file is downloaded, install it in the system.
+- Once installed, select *Launch the Git Bash*, then click on *finish*. The *Git Bash* is now launched.
 
 We want to work later on the project by using the *Git Bash* terminal.
 
@@ -179,16 +186,19 @@ We want to work later on the project by using the *Git Bash* terminal.
 
 - To install this git repository, go to the directory you want to work in (for example: *~/code/*).
 - With *Git Bash*, you have to use the linux command, for example:
+
 ```bash
 cd
 mkdir code
 cd code
 ```
+
 - Git-clone the code of [*tp_rob201*](https://github.com/emmanuel-battesti/tp_rob201):
 
 ```bash
 git clone https://github.com/emmanuel-battesti/tp_rob201.git
 ```
+
 This command will create the directory *tp_rob201* with all the code inside it.
 
 - Create your virtual environment. This command will create a directory *env* where all dependencies will be installed:
