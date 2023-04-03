@@ -45,11 +45,13 @@ class MyRobotSlam(RobotAbstract):
         """
         self.counter += 1
 
-        self.tiny_slam.compute()
+        #self.tiny_slam.update_map(self.lidar(),self.odometer_values())
+        if self.counter%10==0:
+            self.tiny_slam.update_map(self.lidar(),[self.true_position().x,self.true_position().y,self.true_angle()])
 
         # Compute new command speed to perform obstacle avoidance
-        #command = reactive_obst_avoid(self.lidar())
+        command = reactive_obst_avoid(self.lidar())
 
-        command = potential_field_control(self.lidar,self.odometer_values(),[50,-50,1])
+        #command = potential_field_control(self.lidar(),self.odometer_values(),[10,-200,1])
 
         return command

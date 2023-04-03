@@ -5,6 +5,7 @@ import pickle
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+import time
 
 
 class TinySlam:
@@ -166,6 +167,23 @@ class TinySlam:
         pose : [x, y, theta] nparray, corrected pose in world coordinates
         """
         # TODO for TP3
+        start=time.time()
+
+        pOccupation=0.95
+        v1, v2 = lidar.get_sensor_values(), lidar.get_ray_angles()
+        xObs, yObs = pose[0]+v1*np.cos(v2+pose[2]), pose[1]+v1*np.sin(v2+pose[2])
+
+        vectorized_add_map_line = np.vectorize(self.add_map_line,excluded=['x_0','y_0','val'])
+        vectorized_add_map_line(x_0=pose[0],y_0=pose[1],x_1=xObs,y_1=yObs,val=np.log((1-pOccupation)/pOccupation))
+
+        self.add_map_points(np.array([xObs,xObs+1]),np.array([yObs,yObs+1]),np.log(pOccupation/(1-pOccupation)))
+
+        self.occupancy_map[self.occupancy_map > 8],self.occupancy_map[self.occupancy_map < -8]= 8,-8
+        
+        print(f"\t{1/(time.time()-start):.2f} FPS\r", end='')
+        self.display(pose)
+            
+            
 
 
     def plan(self, start, goal):

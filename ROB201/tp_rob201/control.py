@@ -52,6 +52,16 @@ def potential_field_control(lidar, pose, goal):
     gradient = (K/np.sqrt( (pose[0] - goal[0])**2 + (pose[1] - goal[1])**2 )) * (goal[:2] - pose[:2])
     dist = np.sqrt( (pose[0] - goal[0])**2 + (pose[1] - goal[1])**2 )
     print(dist)
+    
+    v1, v2 = lidar.get_sensor_values(), lidar.get_ray_angles()
+    index_min = np.argmin(v1)
+    angle_closer, distance_closer = v2[index_min], v1[index_min]
+    xObs, yObs = distance_closer*np.cos(angle_closer), distance_closer*np.sin(angle_closer)
+    Kobs=1
+    gradientObstacle=(Kobs/distance_closer**3) * (1/distance_closer - 1/50) * (np.array([xObs,yObs]) - pose[:2])
+
+    gradient+=10000*gradientObstacle
+
 
     if dist > 0.5:
         command["forward"] = min(0.01*np.log(dist+1),1) 
