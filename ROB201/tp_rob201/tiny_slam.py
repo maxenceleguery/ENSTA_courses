@@ -5,7 +5,7 @@ import pickle
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
-import time
+import sys
 
 
 class TinySlam:
@@ -26,7 +26,7 @@ class TinySlam:
             (int(self.x_max_map), int(self.y_max_map)))
 
         # Origin of the odom frame in the map frame
-        self.odom_pose_ref = np.array([0, 0, 0])
+        self.odom_pose_ref = np.array([0, 0, 0],dtype=float)
 
     def _conv_world_to_map(self, x_world, y_world):
         """
@@ -130,8 +130,18 @@ class TinySlam:
         pose : [x, y, theta] nparray, position of the robot to evaluate, in world coordinates
         """
         # TODO for TP4
-
-        score = 0
+        v1, v2 = lidar.get_sensor_values(), lidar.get_ray_angles()
+        v1,v2 = v1[v1 < 480],v2[v1 < 480]
+        xObs, yObs = pose[0]+v1*np.cos(v2+pose[2]), pose[1]+v1*np.sin(v2+pose[2])
+        xObs, yObs = self._conv_world_to_map(xObs,yObs)
+        #print(xObs,yObs)
+        select = np.logical_and(np.logical_and(xObs >= 0, xObs < self.x_max_map),
+                                np.logical_and(yObs >= 0, yObs < self.y_max_map))
+        
+        xObs=xObs[select]
+        yObs=yObs[select]
+        
+        score = sum(self.occupancy_map[xObs,yObs])
 
         return score
 
@@ -144,7 +154,13 @@ class TinySlam:
                         use self.odom_pose_ref if not given
         """
         # TODO for TP4
-        corrected_pose = odom_pose
+        if (odom_pose_ref==None).any():
+            odom_pose_ref=self.odom_pose_ref
+
+        corrected_pose = np.array([0,0,0],dtype=float)
+        corrected_pose[0] = odom_pose_ref[0] + np.sqrt(odom[:2].dot(odom[:2]))*np.cos(odom[2]+odom_pose_ref[2])
+        corrected_pose[1] = odom_pose_ref[1] + np.sqrt(odom[:2].dot(odom[:2]))*np.sin(odom[2]+odom_pose_ref[2])
+        corrected_pose[2] = odom[2]+odom_pose_ref[2]
 
         return corrected_pose
 
@@ -155,10 +171,47 @@ class TinySlam:
         odom : [x, y, theta] nparray, raw odometry position
         """
         # TODO for TP4
+        sigma=np.array([30,30,0.3])
+        N=1000
+        #c=0
+        threshold = 400
 
-        best_score = 0
+        """
+        best_score = -sys.float_info.max
+        best_odom_ref = None
+        tmp_odom_ref = self.odom_pose_ref
+        while(best_score<threshold or c<N):
+            tmp_odom_ref += np.random.normal(0, sigma, 3)
+            score = self.score(lidar,self.get_corrected_pose(odom,tmp_odom_ref))
+            if score>best_score:
+                best_score=score
+                best_odom_ref=tmp_odom_ref
+            c+=1
+                
+        if best_score>threshold:
+            self.odom_pose_ref = best_odom_ref
+        else:
+            return None
+        """
 
-        return best_score
+        tmp_odom_ref = self.odom_pose_ref
+        tmp_odom_refs = np.random.normal(0, [sigma]*N, (N,3)) + tmp_odom_ref
+
+        corrected_pose_vectorized = np.vectorize(self.get_corrected_pose,excluded=['odom'],signature='(n),(m)->(n)')
+        corrected_poses = corrected_pose_vectorized(odom,tmp_odom_refs)
+
+        scores = []
+        for pose in corrected_poses:
+            scores.append(self.score(lidar,pose))
+
+        best_index = np.argmax(scores)
+        best_score = scores[best_index]
+        best_odom_ref = tmp_odom_refs[best_index]
+        if best_score>threshold:
+            self.odom_pose_ref = best_odom_ref
+            return best_score
+        else:
+            return None
 
     def update_map(self, lidar, pose):
         """
@@ -167,24 +220,28 @@ class TinySlam:
         pose : [x, y, theta] nparray, corrected pose in world coordinates
         """
         # TODO for TP3
-        start=time.time()
-
         pOccupation=0.95
         v1, v2 = lidar.get_sensor_values(), lidar.get_ray_angles()
+        v1,v2 = v1[v1 < 500],v2[v1 < 500]
         xObs, yObs = pose[0]+v1*np.cos(v2+pose[2]), pose[1]+v1*np.sin(v2+pose[2])
 
         vectorized_add_map_line = np.vectorize(self.add_map_line,excluded=['x_0','y_0','val'])
         vectorized_add_map_line(x_0=pose[0],y_0=pose[1],x_1=xObs,y_1=yObs,val=np.log((1-pOccupation)/pOccupation))
 
-        self.add_map_points(np.array([xObs,xObs+1]),np.array([yObs,yObs+1]),np.log(pOccupation/(1-pOccupation)))
+        vect_dir=np.array([xObs-pose[0],yObs-pose[1]])
+        #print(vect_dir)
+        vect_dir[0,:]=vect_dir[0,:]/np.sqrt(vect_dir[0,:]**2+vect_dir[1,:]**2)
+        vect_dir[1,:]=vect_dir[1,:]/np.sqrt(vect_dir[0,:]**2+vect_dir[1,:]**2)
+
+        vect_dir/=0.4
+
+        self.add_map_points(np.array([xObs]),np.array([yObs]),2*np.log(pOccupation/(1-pOccupation)))
+        self.add_map_points(np.array([xObs-vect_dir[0,:],xObs+vect_dir[0,:]]),np.array([yObs-vect_dir[1,:],yObs+vect_dir[1,:]]),np.log(pOccupation/(1-pOccupation)))
+        #self.add_map_points(np.array([xObs-2*vect_dir[0,:],xObs+2*vect_dir[0,:]]),np.array([yObs-2*vect_dir[1,:],yObs+2*vect_dir[1,:]]),np.log(pOccupation/(1-pOccupation)))
 
         self.occupancy_map[self.occupancy_map > 8],self.occupancy_map[self.occupancy_map < -8]= 8,-8
         
-        print(f"\t{1/(time.time()-start):.2f} FPS\r", end='')
         self.display(pose)
-            
-            
-
 
     def plan(self, start, goal):
         """
