@@ -45,22 +45,35 @@ class MyRobotSlam(RobotAbstract):
         Main control function executed at each time step
         """
         self.counter += 1
+        c=0
+        score=0
+        modulo=3
+        #"""
         start=time.time()
 
         if self.counter in [1,2]:
             self.tiny_slam.update_map(self.lidar(),self.odometer_values())
 
-        score=self.tiny_slam.localise(self.lidar(),self.odometer_values())
-        while score==None:
+        if self.counter%modulo==0:
             score=self.tiny_slam.localise(self.lidar(),self.odometer_values())
-        print(score)
-        self.tiny_slam.update_map(self.lidar(),self.odometer_values())
+            #while score==None and c<1:
+            #    score=self.tiny_slam.localise(self.lidar(),self.odometer_values())
+            #    c+=1
+            #print(score)
+            self.tiny_slam.update_map(self.lidar(),self.odometer_values())
         #self.tiny_slam.update_map(self.lidar(),[self.true_position().x,self.true_position().y,self.true_angle()])
+        if score!=None and self.counter%modulo==0:
+            print(f"Score : {100*score/8000:0.2f}%")
+            print(f"\t\t\t{modulo/(time.time()-start):.2f} FPS\r", end='')
 
         # Compute new command speed to perform obstacle avoidance
-        command = reactive_obst_avoid(self.lidar())
+        if self.tiny_slam.counter < 2000000000:
+            command = reactive_obst_avoid(self.lidar())
+        else:
+            x,y = self.tiny_slam._conv_map_to_world(self.tiny_slam.path[len(self.tiny_slam.path)//6][0],self.tiny_slam.path[len(self.tiny_slam.path)//6][1])
+            goal = [x,y,0]
+            command = potential_field_control(self.lidar(),self.odometer_values(),goal)
+        #"""
 
-        #command = potential_field_control(self.lidar(),self.odometer_values(),[10,-200,1])
-
-        print(f"\t{1/(time.time()-start):.2f} FPS\r", end='')
+        #command = reactive_obst_avoid(self.lidar())
         return command
