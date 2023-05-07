@@ -138,15 +138,13 @@ class TinySlam:
         v1, v2 = lidar.get_sensor_values(), lidar.get_ray_angles()
         mask=[True if i%5==0 else False for i in range(len(v1))] #Taking only 1 out of 5 values for speedup
         v1,v2 = v1[mask],v2[mask]
-        v1,v2 = v1[v1 < 0.95*lidar.max_range],v2[v1 < 0.95*lidar.max_range]
+        v1,v2 = v1[v1 < 0.95*lidar.max_range], v2[v1 < 0.95*lidar.max_range] #Removing false walls detected at max range
         xObs, yObs = pose[0]+v1*np.cos(v2+pose[2]), pose[1]+v1*np.sin(v2+pose[2])
         xObs, yObs = self._conv_world_to_map(xObs,yObs)
-        #print(xObs,yObs)
         select = np.logical_and(np.logical_and(xObs >= 0, xObs < self.x_max_map),
                                 np.logical_and(yObs >= 0, yObs < self.y_max_map))
         
-        xObs=xObs[select]
-        yObs=yObs[select]
+        xObs,yObs=xObs[select],yObs[select]
         
         if len(xObs)>0:
             score = 1000*sum(self.occupancy_map[xObs,yObs])/len(xObs)
@@ -166,8 +164,6 @@ class TinySlam:
         # TODO for TP4
         if (odom_pose_ref==None).any():
             odom_pose_ref=self.odom_pose_ref
-
-        #print(odom)
 
         corrected_pose = np.array([0,0,0],dtype=float)
         corrected_pose[0] = odom_pose_ref[0] + np.sqrt(odom[:2].dot(odom[:2]))*np.cos(odom[2]+odom_pose_ref[2])
@@ -196,53 +192,17 @@ class TinySlam:
         if self.counter > 70:
             threshold = 7000
         threshold*=1
-
         
-        best_score = -sys.float_info.max
-        tmp_odom_ref = None
-        best_odom_ref = self.odom_pose_ref
+        best_score, tmp_odom_ref, best_odom_ref = -sys.float_info.max, None, self.odom_pose_ref
         while (best_score<threshold and c2<N2) and c<N:
-            #print(c,c2)
             tmp_odom_ref = np.random.normal(best_odom_ref, sigma)
             score = self.score(lidar,self.get_corrected_pose(odom,tmp_odom_ref))
             if score>best_score:
-                best_score=score
-                best_odom_ref=tmp_odom_ref
+                best_score, best_odom_ref=score, tmp_odom_ref
                 c2+=1
             c+=1
-
         self.odom_pose_ref = best_odom_ref
         return best_score
-                
-        if best_score>threshold:
-            self.odom_pose_ref = best_odom_ref
-            return best_score
-        else:
-            return None
-        """
-        corrected_pose_vectorized = np.vectorize(self.get_corrected_pose,excluded=['odom'],signature='(n),(m)->(n)')
-
-        for i in range(1):
-            tmp_odom_ref = self.odom_pose_ref
-            tmp_odom_refs = np.random.normal(tmp_odom_ref, [sigma]*N, (N,3))
-
-            corrected_poses = corrected_pose_vectorized(odom,tmp_odom_refs)
-
-            scores = []
-            for pose in corrected_poses:
-                scores.append(self.score(lidar,pose))
-
-            best_index = np.argmax(scores)
-            best_score = scores[best_index]
-            best_odom_ref = tmp_odom_refs[best_index]
-            self.odom_pose_ref = best_odom_ref
-
-        if best_score>threshold:
-            self.odom_pose_ref = best_odom_ref
-            return best_score
-        else:
-            return None
-        """
 
     def update_map(self, lidar, pose):
         """
@@ -253,9 +213,12 @@ class TinySlam:
         # TODO for TP3
         pOccupation=0.95
         v1,v2 = lidar.get_sensor_values(), lidar.get_ray_angles()
-        mask=[True if i%1==0 else False for i in range(len(v1))] #Taking only 1 out of 2 values for speedup
+        n=1
+        mask=[True if i%n==0 else False for i in range(len(v1))] #Taking only 1 out of n values for speedup
         v1,v2 = v1[mask],v2[mask]
-        v1,v2 = v1[v1 < 0.95*lidar.max_range],v2[v1 < 0.95*lidar.max_range]
+        v1,v2 = v1[v1 < 0.95*lidar.max_range], v2[v1 < 0.95*lidar.max_range] #Removing false walls detected at max range
+
+        # If not to close to walls, we let a space between the wall and the end of the zone considered as free of obstacles
         if min(v1) > 30:
             v1_prime = v1[:]-25
         else:
@@ -264,18 +227,14 @@ class TinySlam:
         xObs, yObs = pose[0]+v1*np.cos(v2+pose[2]), pose[1]+v1*np.sin(v2+pose[2])
         xL, yL = pose[0]+v1_prime*np.cos(v2_prime+pose[2]), pose[1]+v1_prime*np.sin(v2_prime+pose[2])
 
-
         vectorized_add_map_line = np.vectorize(self.add_map_line,excluded=['x_0','y_0','val'])
         vectorized_add_map_line(x_0=pose[0],y_0=pose[1],x_1=xL,y_1=yL,val=np.log((1-pOccupation)/pOccupation))
 
-        #"""
+        # Using the direction of the lidar's ray to thicken the wall on the map
         vect_dir=np.array([xObs-pose[0],yObs-pose[1]])
-        #print(vect_dir)
         vect_dir[0,:]=vect_dir[0,:]/np.sqrt(vect_dir[0,:]**2+vect_dir[1,:]**2)
         vect_dir[1,:]=vect_dir[1,:]/np.sqrt(vect_dir[0,:]**2+vect_dir[1,:]**2)
-
         vect_dir/=0.4
-        #"""
 
         self.add_map_points(np.array([xObs]),np.array([yObs]),np.log(pOccupation/(1-pOccupation)))
         self.add_map_points(np.array([xObs-vect_dir[0,:],xObs+vect_dir[0,:]]),np.array([yObs-vect_dir[1,:],yObs+vect_dir[1,:]]),np.log(pOccupation/(1-pOccupation)))
@@ -283,6 +242,7 @@ class TinySlam:
 
         self.occupancy_map[self.occupancy_map > 8],self.occupancy_map[self.occupancy_map < -8]= 8,-8
 
+        # Compute the path to the origine after a certain time
         if self.counter==0 or (self.counter > 190 and self.counter%100==0):
             self.path = self.plan(pose,[0,0,0])
         
@@ -293,6 +253,7 @@ class TinySlam:
 
     def get_neighbors(self, current):
         """
+        Get the neighbors of the current pose
         current : [x, y] nparray, corrected pose in map coordinates
         """
         offset=1
@@ -311,13 +272,16 @@ class TinySlam:
 
     def heuristic(self, a, b):
         """
+        Use the euclidean distance as heuristic for the A* algorithm
         a,b : [x, y] nparray, corrected pose in map coordinates
         """
-        a=np.array(a)
-        b=np.array(b)
+        a,b=np.array(a),np.array(b)
         return np.sqrt(np.dot(b-a,b-a)) 
 
     def reconstruct_path(self,cameFrom,current):
+        """
+        Reconstruct the path from the end using the cameFrom dictionnary
+        """
         total_path = [current]
         while current in cameFrom.keys():
             current = cameFrom[current]
@@ -337,16 +301,13 @@ class TinySlam:
 
         start_x_map, start_y_map = self._conv_world_to_map(start[0],start[1])
         goal_x_map, goal_y_map = self._conv_world_to_map(goal[0],goal[1]) 
-        start_map = (start_x_map,start_y_map)
-        goal_map = (goal_x_map,goal_y_map)
+        start_map, goal_map = (start_x_map,start_y_map), (goal_x_map,goal_y_map)
 
-        gScore={start_map:0}
-        fScore={start_map:self.heuristic(start_map,goal_map)}
+        gScore, fScore = {start_map:0}, {start_map:self.heuristic(start_map,goal_map)}
 
         heapq.heappush(h,(self.heuristic(start_map,goal_map),start_map))
 
         while len(h) > 0:
-            #print(len(h))
             current = heapq.heappop(h)[1]
             if current==goal_map:
                 return self.reconstruct_path(cameFrom,current)
@@ -360,7 +321,7 @@ class TinySlam:
                     if len(h_array)==0 or (not (n in h_array[:,1])):
                         heapq.heappush(h,(fScore[n],n))
 
-    def display(self, robot_pose,path):
+    def display(self, robot_pose, path):
         """
         Screen display of map and robot pose, using matplotlib
         robot_pose : [x, y, theta] nparray, corrected robot pose
@@ -379,7 +340,7 @@ class TinySlam:
         
         path=np.array(path)
         path[:,0],path[:,1] = self._conv_map_to_world(path[:,0],path[:,1])
-        plt.plot(path[:,0], path[:,1],color='black')
+        #plt.plot(path[:,0], path[:,1],color='black')
 
         # plt.show()
         plt.pause(0.001)

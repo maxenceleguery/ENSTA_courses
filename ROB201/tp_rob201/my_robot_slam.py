@@ -47,33 +47,28 @@ class MyRobotSlam(RobotAbstract):
         self.counter += 1
         c=0
         score=0
-        modulo=3
-        #"""
+        modulo=3 
+
         start=time.time()
 
-        if self.counter in [1,2]:
+        if self.counter in [1,2]: #Map's initialization
             self.tiny_slam.update_map(self.lidar(),self.odometer_values())
 
-        if self.counter%modulo==0:
+        if self.counter%modulo==0: #Localization and mapping during 1 out of modulo iterations
             score=self.tiny_slam.localise(self.lidar(),self.odometer_values())
-            #while score==None and c<1:
-            #    score=self.tiny_slam.localise(self.lidar(),self.odometer_values())
-            #    c+=1
-            #print(score)
             self.tiny_slam.update_map(self.lidar(),self.odometer_values())
-        #self.tiny_slam.update_map(self.lidar(),[self.true_position().x,self.true_position().y,self.true_angle()])
-        if score!=None and self.counter%modulo==0:
-            print(f"Score : {100*score/8000:0.2f}%")
+            print(f"Score : {score:0.2f}")
             print(f"\t\t\t{modulo/(time.time()-start):.2f} FPS\r", end='')
 
-        # Compute new command speed to perform obstacle avoidance
+        #Debug only
+        #self.tiny_slam.update_map(self.lidar(),[self.true_position().x,self.true_position().y,self.true_angle()])            
+
+        # Follow walls first and then go back to the origine
         if self.tiny_slam.counter < 2000000000:
             command = reactive_obst_avoid(self.lidar())
         else:
             x,y = self.tiny_slam._conv_map_to_world(self.tiny_slam.path[len(self.tiny_slam.path)//6][0],self.tiny_slam.path[len(self.tiny_slam.path)//6][1])
             goal = [x,y,0]
             command = potential_field_control(self.lidar(),self.odometer_values(),goal)
-        #"""
 
-        #command = reactive_obst_avoid(self.lidar())
         return command
